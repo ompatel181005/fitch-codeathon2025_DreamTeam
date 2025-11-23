@@ -2,10 +2,13 @@
 import pandas as pd
 import numpy as np
 
-from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold, KFold
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from catboost import CatBoostRegressor, Pool
+
+
+
 
 # -----------------------------
 # 1) LOAD DATA
@@ -19,24 +22,66 @@ sdg    = pd.read_csv("data/sustainable_development_goals.csv")
 # -----------------------------
 # 2) SECTOR FEATURES
 # -----------------------------
+# BASE sector table
 sector["revenue_frac"] = sector["revenue_pct"] / 100.0
 
-top_sector = (sector.sort_values(["entity_id", "revenue_pct"], ascending=False)
-                    .groupby("entity_id")
-                    .first()[["nace_level_2_code", "nace_level_1_code"]]
-                    .rename(columns={
-                        "nace_level_2_code": "top_nace2",
-                        "nace_level_1_code": "top_nace1"
-                    }))
+# --- Base sector features ---
+top_sector = (
+    sector.sort_values(["entity_id", "revenue_pct"], ascending=False)
+          .groupby("entity_id")
+          .first()[["nace_level_2_code","nace_level_1_code"]]
+          .rename(columns={"nace_level_2_code":"top_nace2",
+                           "nace_level_1_code":"top_nace1"})
+)
 
-entropy = (sector.groupby("entity_id")["revenue_frac"]
-                 .apply(lambda p: -(p * np.log(p + 1e-12)).sum())
-                 .to_frame("sector_entropy"))
+entropy = (
+    sector.groupby("entity_id")["revenue_frac"]
+          .apply(lambda p: -(p*np.log(p+1e-12)).sum())
+          .to_frame("sector_entropy")
+)
 
 lvl2_count = sector.groupby("entity_id")["nace_level_2_code"].nunique().to_frame("nace2_count")
 lvl1_count = sector.groupby("entity_id")["nace_level_1_code"].nunique().to_frame("nace1_count")
 
 sector_feat = top_sector.join([entropy, lvl2_count, lvl1_count]).reset_index()
+
+# ========================
+# SAFE MERGE OF pct + HHI
+# ========================
+sec_sorted = sector.sort_values(["entity_id", "revenue_pct"], ascending=False)
+
+top_pct = sec_sorted.groupby("entity_id")["revenue_frac"].first().rename("top_sector_pct")
+second_pct = sec_sorted.groupby("entity_id")["revenue_frac"].nth(1).fillna(0).rename("second_sector_pct")
+hhi = sector.groupby("entity_id")["revenue_frac"].apply(lambda p: (p**2).sum()).rename("sector_hhi")
+
+right_df = pd.concat([top_pct, second_pct, hhi], axis=1).reset_index()
+
+# FIX: ensure entity_id column exists
+if "entity_id" not in right_df.columns:
+    right_df = right_df.rename(columns={"index": "entity_id"})
+
+sector_feat = sector_feat.merge(right_df, on="entity_id", how="left")
+
+# ========================
+# SAFE MERGE OF LEVEL-1 MIX
+# ========================
+lvl1_mix = (
+    sector.pivot_table(index="entity_id",
+                       columns="nace_level_1_code",
+                       values="revenue_frac",
+                       aggfunc="sum",
+                       fill_value=0)
+          .add_prefix("nace1_frac_")
+          .reset_index()
+)
+
+# FIX: ensure entity_id column exists
+if "entity_id" not in lvl1_mix.columns:
+    lvl1_mix = lvl1_mix.rename(columns={"index": "entity_id"})
+
+sector_feat = sector_feat.merge(lvl1_mix, on="entity_id", how="left")
+
+
 
 # -----------------------------
 # 3) ENVIRONMENTAL ACTIVITIES FEATURES
@@ -65,6 +110,22 @@ if len(acts) > 0:
                   .add_prefix("env_type_sum_"))
 
     acts_feat = agg_basic.join(type_pivot).reset_index()
+
+    # magnitude features INSIDE the if
+    acts["pos_mag"] = acts["env_score_adjustment"].clip(lower=0)
+    acts["neg_mag"] = (-acts["env_score_adjustment"]).clip(lower=0)
+
+    extra_act = acts.groupby("entity_id").agg(
+        env_pos_mag_sum=("pos_mag","sum"),
+        env_neg_mag_sum=("neg_mag","sum"),
+        env_max_pos=("env_score_adjustment", lambda s: s[s>0].max() if (s>0).any() else 0),
+        env_max_neg=("env_score_adjustment", lambda s: s[s<0].min() if (s<0).any() else 0),
+        env_type_count=("activity_type","nunique"),
+        env_code_count=("activity_code","nunique"),
+    ).reset_index()
+
+    acts_feat = acts_feat.merge(extra_act, on="entity_id", how="left")
+
 else:
     acts_feat = pd.DataFrame({"entity_id": train["entity_id"].unique()})
 
@@ -254,12 +315,17 @@ cat_idx = [X_train.columns.get_loc(c) for c in cat_cols]
 # -----------------------------
 # 11) TRAIN MODELS (LOG + WEIGHTS)
 # -----------------------------
-def train_catboost(X, y_log, cat_features, label_name, y_raw, weights, params):
-    kf = KFold(n_splits=5, shuffle=True, random_state=42)
+def make_strat_bins(y_raw, n_bins=5):
+    y_log = np.log1p(y_raw)
+    return pd.qcut(y_log, q=n_bins, labels=False, duplicates="drop")
+
+bins1 = make_strat_bins(y1_raw)
+bins2 = make_strat_bins(y2_raw)
+def train_catboost(X, y_log, cat_features, label_name, y_raw, weights, params, bins):
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     oof_log = np.zeros(len(X))
     models = []
-
-    for fold, (tr_idx, val_idx) in enumerate(kf.split(X)):
+    for fold, (tr_idx, val_idx) in enumerate(skf.split(X,bins)):
         X_tr, X_val = X.iloc[tr_idx], X.iloc[val_idx]
         y_tr, y_val = y_log[tr_idx], y_log[val_idx]
         w_tr, w_val = weights[tr_idx], weights[val_idx]
@@ -311,10 +377,10 @@ def train_catboost(X, y_log, cat_features, label_name, y_raw, weights, params):
 
 
 params_scope1 = dict(
-    iterations=5000,
+    iterations=4500,
     learning_rate=0.03,
-    depth=8,
-    l2_leaf_reg=5,
+    depth=7,
+    l2_leaf_reg=6,
     loss_function="RMSE",
     eval_metric="RMSE",
     random_seed=42,
@@ -323,19 +389,23 @@ params_scope1 = dict(
 )
 
 params_scope2 = dict(
-    iterations=6000,
+    iterations=6500,
     learning_rate=0.025,
-    depth=10,
-    l2_leaf_reg=6,
+    depth=9,
+    l2_leaf_reg=8,
     loss_function="RMSE",
     eval_metric="RMSE",
     random_seed=42,
     early_stopping_rounds=300,
-    verbose=200
+    verbose=200,
+    subsample=0.8,                 # regularize with row sampling
+    bootstrap_type="Bernoulli"
 )
 
-models1 = train_catboost(X_train, target1, cat_idx, "Scope 1", y1_raw, w1, params_scope1)
-models2 = train_catboost(X_train, target2, cat_idx, "Scope 2", y2_raw, w2, params_scope2)
+
+models1 = train_catboost(X_train, target1, cat_idx, "Scope 1", y1_raw, w1, params_scope1, bins1)
+models2 = train_catboost(X_train, target2, cat_idx, "Scope 2", y2_raw, w2, params_scope2, bins2)
+
 
 # -----------------------------
 # 12) PREDICT TEST
