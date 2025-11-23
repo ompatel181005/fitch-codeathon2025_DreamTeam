@@ -60,7 +60,7 @@ train_sdg['s2_per_dollar'] = train_sdg['target_scope_2'] / train_sdg['revenue']
 avg_emissions_sdg = train_sdg.groupby('SDG_Score')[['s1_per_dollar','s2_per_dollar']].mean()
 print(avg_emissions_sdg)
 
-avg_emissions_sdg.to_csv('avg_emissions_sdg.csv',index=False)
+avg_emissions_sdg.to_csv('avg_emissions_sdg.csv',index=True)
 
 #debug
 # print(train_sdg[['entity_id','SDG_Score',
