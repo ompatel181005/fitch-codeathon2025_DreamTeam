@@ -45,7 +45,11 @@ print(f"Number of Common Entities {len(common_entities)}")
 print("\n\nSDG Scores:")
 # SDG Score : [0,3]
 
-sdg_scores = {} # dictionary
+
+
+# test_entity = test_file.groupby('entity_id')['sdg_id'].to_dict()
+
+# for entity_id, sdg_id in list(test_entity.items()):
 
 # entity_dict:
 # [entity_id] = {sdg_set}
@@ -62,4 +66,46 @@ sdg_scores = {} # dictionary
 #             print(f"Entity {entity_id}: Score = 0")
 #         else:
 #             print(f"Entity {entity_id}: Score = {score}")
+
+sdgScore = pd.DataFrame()
+
+sdgScore = test_file[['entity_id']].copy()
+
+# newCol = {'SDG Score'}
+# sdgScore = sdgScore.assign(*newCol)
+
+sdgScore["SDG_Score"] = 0
+
+# print(sdgScore)
+
+
+# sdgScore = sdgScore.groupby(by='entity_id').count()
+# print(sdgScore)
+
+pd.set_option('display.max_rows', None)
+# pd.set_option('display.max_columns', None)
+# sdg_file = sdg_file['entity_id'].unique()
+# sdg_file.groupby(by="entity_id")
+# sdg_file = sdg_file.merge(sdg_file, on="entity_id")
+
+# result = pd.concat([sdg_file, sdg_file], axis=1)
+
+sdgScore = sdg_file.groupby('entity_id')['entity_id'].size().reset_index(name='SDG_Score')
+
+result = test_file.merge(sdgScore, on='entity_id', how='left')
+
+# mergeFile = test_file.merge(sdgScore, on='entity_id', how='left')
+
+result['SDG_Score'] = result['SDG_Score'].fillna(0).astype(int)
+
+print(result[['entity_id','SDG_Score']]) 
+
+result.to_csv('sdg_scores.csv',index=False)
+
+
+# sdgScore = test_file.merge(sdgScore, on='entity_id')
+# # sdgScore[['entity_id','SDG Score']]
+
+
+# print(sdgScore)
 
