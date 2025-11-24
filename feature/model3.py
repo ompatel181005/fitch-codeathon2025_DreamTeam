@@ -5,9 +5,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-env = pd.read_csv('./data/environmental_activities.csv')
 rev = pd.read_csv('./data/revenue_distribution_by_sector.csv')
-sustain = pd.read_csv('./data/sustainable_development_goals.csv')
 train_raw = pd.read_csv('./data/train.csv')
 
 ### model 1 - nace level 1
@@ -73,3 +71,34 @@ coeff2 = pd.DataFrame(data={'nace_level_2_code':coeff2_scope1_df['nace_level_2_c
                            'coefficient_scope_2':coeff2_scope2_df['coefficient']})
 
 coeff2.to_csv('./feature/nace2_coeff.csv', index=False)
+
+## testing
+
+train_estimate = train_raw.drop(['target_scope_1', 'target_scope_2'], axis=1)
+train_estimate = pd.merge(train_estimate,
+                 rev[['entity_id', 'nace_level_1_code', 'revenue_pct']],
+                 how='inner', on='entity_id')
+train_estimate['revenue_pct_new'] = train_estimate.groupby(['entity_id', 'nace_level_1_code'])['revenue_pct'].transform('sum')
+train_estimate = train_estimate.drop('revenue_pct', axis=1).drop_duplicates(keep='first')
+
+train_estimate = train_estimate.merge(coeff1[['nace_level_1_code', 'coefficient_scope_1']],
+                                      on='nace_level_1_code',
+                                      how='left')
+
+train_estimate = train_estimate.merge(coeff1[['nace_level_1_code', 'coefficient_scope_2']],
+                                      on='nace_level_1_code',
+                                      how='left')
+
+train_estimate['target_scope_1'] = train_estimate['revenue_pct_new'] * train_estimate['revenue'] * train_estimate['coefficient_scope_1']
+train_estimate['target_scope_2'] = train_estimate['revenue_pct_new'] * train_estimate['revenue'] * train_estimate['coefficient_scope_2']
+
+train_estimate['target_scope_1'] = train_estimate['target_scope_1'].where(train_estimate['target_scope_1'] >= 0, 0)
+train_estimate['target_scope_2'] = train_estimate['target_scope_2'].where(train_estimate['target_scope_2'] >= 0, 0)
+
+train_estimate = train_estimate.drop(['nace_level_1_code', 'revenue_pct_new', 'coefficient_scope_1', 'coefficient_scope_2'], axis=1)
+train_estimate['target_scope_1'] = train_estimate.groupby('entity_id')['target_scope_1'].transform('sum')
+train_estimate['target_scope_2'] = train_estimate.groupby('entity_id')['target_scope_2'].transform('sum')
+train_estimate = train_estimate.drop_duplicates(keep='first')
+
+mae_scope1 = mean_absolute_error(train_raw.sort_values(by='entity_id')[['target_scope_1']], train_estimate.sort_values(by='entity_id')[['target_scope_1']])
+mae_scope2 = mean_absolute_error(train_raw.sort_values(by='entity_id')[['target_scope_2']], train_estimate.sort_values(by='entity_id')[['target_scope_2']])
