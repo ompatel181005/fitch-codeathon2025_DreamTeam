@@ -76,57 +76,55 @@ coeff2.to_csv('./feature/nace2_coeff.csv', index=False)
 
 ## adding sdgs (7, 12, 13)
 
-sdg_n = sdg[sdg['sdg_id'].isin([7, 12, 13])]
-sdg_n = pd.DataFrame(sdg_n.groupby('entity_id').size())
-sdg_n.columns = ['n']
-sdg_n = sdg_n.reset_index()
+# sdg_n = sdg[sdg['sdg_id'].isin([7, 12, 13])]
+# sdg_n = pd.DataFrame(sdg_n.groupby('entity_id').size())
+# sdg_n.columns = ['n']
+# sdg_n = sdg_n.reset_index()
 
-sdg_2 = train_raw[train_raw['entity_id'].isin(sdg_n[sdg_n['n'] == 2]['entity_id'])]
-sdg_1 = train_raw[train_raw['entity_id'].isin(sdg_n[sdg_n['n'] == 1]['entity_id'])]
-sdg_0 = train_raw[~train_raw['entity_id'].isin(sdg_n['entity_id'])]
+# sdg_2 = train_raw[train_raw['entity_id'].isin(sdg_n[sdg_n['n'] == 2]['entity_id'])]
+# sdg_1 = train_raw[train_raw['entity_id'].isin(sdg_n[sdg_n['n'] == 1]['entity_id'])]
+# sdg_0 = train_raw[~train_raw['entity_id'].isin(sdg_n['entity_id'])]
 
-sdg_2['scope_1_per_usd'] = sdg_2['target_scope_1'] / sdg_2['revenue']
-sdg_1['scope_1_per_usd'] = sdg_1['target_scope_1'] / sdg_1['revenue']   
-sdg_0['scope_1_per_usd'] = sdg_0['target_scope_1'] / sdg_0['revenue']
-sdg_2['scope_2_per_usd'] = sdg_2['target_scope_2'] / sdg_2['revenue']
-sdg_1['scope_2_per_usd'] = sdg_1['target_scope_2'] / sdg_1['revenue']
-sdg_0['scope_2_per_usd'] = sdg_0['target_scope_2'] / sdg_0['revenue']
+# sdg_2['scope_1_per_usd'] = sdg_2['target_scope_1'] / sdg_2['revenue']
+# sdg_1['scope_1_per_usd'] = sdg_1['target_scope_1'] / sdg_1['revenue']   
+# sdg_0['scope_1_per_usd'] = sdg_0['target_scope_1'] / sdg_0['revenue']
+# sdg_2['scope_2_per_usd'] = sdg_2['target_scope_2'] / sdg_2['revenue']
+# sdg_1['scope_2_per_usd'] = sdg_1['target_scope_2'] / sdg_1['revenue']
+# sdg_0['scope_2_per_usd'] = sdg_0['target_scope_2'] / sdg_0['revenue']
 
-sdg_2 = sdg_2.drop(['target_scope_1', 'target_scope_2'], axis=1)
-sdg_1 = sdg_1.drop(['target_scope_1', 'target_scope_2'], axis=1)
-sdg_0 = sdg_0.drop(['target_scope_1', 'target_scope_2'], axis=1)
+# sdg_2 = sdg_2.drop(['target_scope_1', 'target_scope_2'], axis=1)
+# sdg_1 = sdg_1.drop(['target_scope_1', 'target_scope_2'], axis=1)
+# sdg_0 = sdg_0.drop(['target_scope_1', 'target_scope_2'], axis=1)
 
-sdg_0_coeff_1 = np.mean(sdg_0['scope_1_per_usd'])
-sdg_1_coeff_1 = np.mean(sdg_1['scope_1_per_usd']) / sdg_0_coeff_1
-sdg_2_coeff_1 = np.mean(sdg_2['scope_1_per_usd']) / sdg_0_coeff_1
+# sdg_0_coeff_1 = np.mean(sdg_0['scope_1_per_usd'])
+# sdg_1_coeff_1 = np.mean(sdg_1['scope_1_per_usd']) / sdg_0_coeff_1
+# sdg_2_coeff_1 = np.mean(sdg_2['scope_1_per_usd']) / sdg_0_coeff_1
 
-sdg_0_coeff_2 = np.mean(sdg_0['scope_2_per_usd'])
-sdg_1_coeff_2 = np.mean(sdg_1['scope_2_per_usd']) / sdg_0_coeff_2
-sdg_2_coeff_2 = np.mean(sdg_2['scope_2_per_usd']) / sdg_0_coeff_2
+# sdg_0_coeff_2 = np.mean(sdg_0['scope_2_per_usd'])
+# sdg_1_coeff_2 = np.mean(sdg_1['scope_2_per_usd']) / sdg_0_coeff_2
+# sdg_2_coeff_2 = np.mean(sdg_2['scope_2_per_usd']) / sdg_0_coeff_2
 
-sdg_coeff_dict = {1: (sdg_1_coeff_1, sdg_1_coeff_2),
-                  2: (sdg_2_coeff_1, sdg_2_coeff_2),
-                  0: (1, 1)}
+# sdg_coeff_dict = {1: (sdg_1_coeff_1, sdg_1_coeff_2),
+#                   2: (sdg_2_coeff_1, sdg_2_coeff_2),
+#                   0: (1, 1)}
 
-def apply_sdg_coeff(df):
-    df['n'] = df['entity_id'].map(sdg_n.set_index('entity_id')['n']).fillna(0)
-    df['n'] = pd.to_numeric(df['n'], downcast='integer')
-    df['coeff'] = df['n'].map(sdg_coeff_dict)
-    df['scope_1_coeff'] = [t[0] for t in df['coeff']]
-    df['scope_2_coeff'] = [t[1] for t in df['coeff']]
-    df = df.drop(['n', 'coeff'], axis=1)
-    df['target_scope_1'] = df['target_scope_1'] * df['scope_1_coeff']
-    df['target_scope_2'] = df['target_scope_2'] * df['scope_2_coeff']
-    df = df.drop(['scope_1_coeff', 'scope_2_coeff'], axis=1)
-    return df
+# def apply_sdg_coeff(df):
+#     df['n'] = df['entity_id'].map(sdg_n.set_index('entity_id')['n']).fillna(0)
+#     df['n'] = pd.to_numeric(df['n'], downcast='integer')
+#     df['coeff'] = df['n'].map(sdg_coeff_dict)
+#     df['scope_1_coeff'] = [t[0] for t in df['coeff']]
+#     df['scope_2_coeff'] = [t[1] for t in df['coeff']]
+#     df = df.drop(['n', 'coeff'], axis=1)
+#     df['target_scope_1'] = df['target_scope_1'] * df['scope_1_coeff']
+#     df['target_scope_2'] = df['target_scope_2'] * df['scope_2_coeff']
+#     df = df.drop(['scope_1_coeff', 'scope_2_coeff'], axis=1)
+#     return df
 
 ## nation?
 
-country_n = pd.DataFrame(train_raw.groupby('country_code').size())
-country_n.columns = ['n']
-country_n = country_n[country_n['n'] > 1].reset_index()
-
-
+# country_n = pd.DataFrame(train_raw.groupby('country_code').size())
+# country_n.columns = ['n']
+# country_n = country_n[country_n['n'] > 1].reset_index()
 
 ## testing - nace level 1
 
@@ -222,4 +220,4 @@ test_estimate['target_scope_1'] = test_estimate.groupby('entity_id')['target_sco
 test_estimate['target_scope_2'] = test_estimate.groupby('entity_id')['target_scope_2'].transform('sum')
 test_estimate = test_estimate.drop_duplicates(keep='first')
 
-test_estimate.to_csv('./feature/test_estimate.csv', index=False)
+test_estimate[['entity_id', 'target_scope_1', 'target_scope_2']].to_csv('./feature/test_estimate.csv', index=False)
