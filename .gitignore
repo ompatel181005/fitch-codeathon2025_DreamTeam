@@ -4,9 +4,6 @@
 
 # Old/Experimental Files (Not Required for Submission)
 Old_Files_Not_required/
-Old_files_Not_required/
-feature/
-functions/
 
 # Python Cache
 __pycache__/
@@ -37,8 +34,6 @@ ENV/
 *.joblib
 catboost_info/
 
-# Generated Outputs (Optional - Can Regenerate)
-feature_importance_*.csv
 
 # Logs and Temporary Files
 *.log
