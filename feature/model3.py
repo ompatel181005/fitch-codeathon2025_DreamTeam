@@ -120,6 +120,14 @@ def apply_sdg_coeff(df):
     df = df.drop(['scope_1_coeff', 'scope_2_coeff'], axis=1)
     return df
 
+## nation?
+
+country_n = pd.DataFrame(train_raw.groupby('country_code').size())
+country_n.columns = ['n']
+country_n = country_n[country_n['n'] > 1].reset_index()
+
+
+
 ## testing - nace level 1
 
 train_estimate1 = train_raw.drop(['target_scope_1', 'target_scope_2'], axis=1)
