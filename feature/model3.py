@@ -18,32 +18,29 @@ train1 = pd.merge(train1,
                  how='inner', on='entity_id')
 train1['revenue_pct_new'] = train1.groupby(['entity_id', 'nace_level_1_code'])['revenue_pct'].transform('sum')
 train1 = train1.drop('revenue_pct', axis=1).drop_duplicates(keep='first')
-train1['scope_1_per_nace'] = train1['target_scope_1'] * train1['revenue_pct_new']
-train1['scope_2_per_nace'] = train1['target_scope_2'] * train1['revenue_pct_new']
+train1['revenue_in_nace'] = train1['revenue'] * train1['revenue_pct_new']
 
-X1_scope1 = train1.pivot_table(index='entity_id', columns='nace_level_1_code', values='scope_1_per_nace', aggfunc='first').sort_values(by='entity_id').fillna(0).to_numpy()
+X1 = train1.pivot_table(index='entity_id', columns='nace_level_1_code', values='revenue_in_nace', aggfunc='first').sort_values(by='entity_id').fillna(0).to_numpy()
 y1_scope1 = train_raw.sort_values(by='entity_id')[['target_scope_1']]
-
-X1_scope2 = train1.pivot_table(index='entity_id', columns='nace_level_1_code', values='scope_2_per_nace', aggfunc='first').sort_values(by='entity_id').fillna(0).to_numpy()
 y1_scope2 = train_raw.sort_values(by='entity_id')[['target_scope_2']]
 
 model1_scope1 = LinearRegression(fit_intercept=False)
-model1_scope1.fit(X1_scope1, y1_scope1)
+model1_scope1.fit(X1, y1_scope1)
 
 model1_scope2 = LinearRegression(fit_intercept=False)
-model1_scope2.fit(X1_scope2, y1_scope2)
+model1_scope2.fit(X1, y1_scope2)
 
 coeff1_scope1 = model1_scope1.coef_
 coeff1_scope2 = model1_scope2.coef_
 
-coeff1_scope1_df = pd.DataFrame(data={'nace_level_1_code':list(train1.pivot_table(index='entity_id', columns='nace_level_1_code', values='scope_1_per_nace', aggfunc='first').columns), 'coefficient':coeff1_scope1[0]})
-coeff1_scope2_df = pd.DataFrame(data={'nace_level_1_code':list(train1.pivot_table(index='entity_id', columns='nace_level_1_code', values='scope_2_per_nace', aggfunc='first').columns), 'coefficient':coeff1_scope2[0]})
+coeff1_scope1_df = pd.DataFrame(data={'nace_level_1_code':list(train1.pivot_table(index='entity_id', columns='nace_level_1_code', values='revenue_in_nace', aggfunc='first').columns), 'coefficient':coeff1_scope1[0]})
+coeff1_scope2_df = pd.DataFrame(data={'nace_level_1_code':list(train1.pivot_table(index='entity_id', columns='nace_level_1_code', values='revenue_in_nace', aggfunc='first').columns), 'coefficient':coeff1_scope2[0]})
 
 coeff1 = pd.DataFrame(data={'nace_level_1_code':coeff1_scope1_df['nace_level_1_code'],
                             'coefficient_scope_1':coeff1_scope1_df['coefficient'],
                            'coefficient_scope_2':coeff1_scope2_df['coefficient']})
 
-coeff1.to_csv('./feature/nace1_coeff.csv')
+coeff1.to_csv('./feature/nace1_coeff.csv', index=False)
 
 ### model 2 - nace level 2
 
@@ -53,29 +50,26 @@ train2 = pd.merge(train2,
                  how='inner', on='entity_id')
 train2['revenue_pct_new'] = train2.groupby(['entity_id', 'nace_level_2_code'])['revenue_pct'].transform('sum')
 train2 = train2.drop('revenue_pct', axis=1).drop_duplicates(keep='first')
-train2['scope_1_per_nace'] = train2['revenue'] * train2['target_scope_1']
-train2['scope_2_per_nace'] = train2['revenue'] * train2['target_scope_2']
+train2['revenue_in_nace'] = train2['revenue'] * train2['revenue_pct_new']
 
-X2_scope1 = train2.pivot_table(index='entity_id', columns='nace_level_2_code', values='scope_1_per_nace', aggfunc='first').sort_values(by='entity_id').fillna(0).to_numpy()
+X2 = train2.pivot_table(index='entity_id', columns='nace_level_2_code', values='revenue_in_nace', aggfunc='first').sort_values(by='entity_id').fillna(0).to_numpy()
 y2_scope1 = train_raw.sort_values(by='entity_id')[['target_scope_1']]
-
-X2_scope2 = train2.pivot_table(index='entity_id', columns='nace_level_2_code', values='scope_1_per_nace', aggfunc='first').sort_values(by='entity_id').fillna(0).to_numpy()
 y2_scope2 = train_raw.sort_values(by='entity_id')[['target_scope_2']]
 
 model2_scope1 = LinearRegression(fit_intercept=False)
-model2_scope1.fit(X2_scope1, y2_scope1)
+model2_scope1.fit(X2, y2_scope1)
 
 model2_scope2 = LinearRegression(fit_intercept=False)
-model2_scope2.fit(X2_scope2, y2_scope2)
+model2_scope2.fit(X2, y2_scope2)
 
 coeff2_scope1 = model2_scope1.coef_
 coeff2_scope2 = model2_scope2.coef_
 
-coeff2_scope1_df = pd.DataFrame(data={'nace_level_2_code':list(train2.pivot_table(index='entity_id', columns='nace_level_2_code', values='scope_1_per_nace', aggfunc='first').columns), 'coefficient':coeff2_scope1[0]})
-coeff2_scope2_df = pd.DataFrame(data={'nace_level_2_code':list(train2.pivot_table(index='entity_id', columns='nace_level_2_code', values='scope_2_per_nace', aggfunc='first').columns), 'coefficient':coeff2_scope2[0]})
+coeff2_scope1_df = pd.DataFrame(data={'nace_level_2_code':list(train2.pivot_table(index='entity_id', columns='nace_level_2_code', values='revenue_in_nace', aggfunc='first').columns), 'coefficient':coeff2_scope1[0]})
+coeff2_scope2_df = pd.DataFrame(data={'nace_level_2_code':list(train2.pivot_table(index='entity_id', columns='nace_level_2_code', values='revenue_in_nace', aggfunc='first').columns), 'coefficient':coeff2_scope2[0]})
 
 coeff2 = pd.DataFrame(data={'nace_level_2_code':coeff2_scope1_df['nace_level_2_code'],
-                            'coefficient_scope_':coeff2_scope1_df['coefficient'],
+                            'coefficient_scope_1':coeff2_scope1_df['coefficient'],
                            'coefficient_scope_2':coeff2_scope2_df['coefficient']})
 
-coeff2.to_csv('./feature/nace2_coeff.csv')
+coeff2.to_csv('./feature/nace2_coeff.csv', index=False)
